@@ -8,10 +8,9 @@ authors = ["KODEGEN.ᴀɪ"]
 homepage = "https://kodegen.ai"
 repository = "https://github.com/cyrup-ai/kodegen-mcp-client"
 readme = "README.md"
-categories = ["development-tools", "client", "api-bindings"]
+categories = ["development-tools","api-bindings"]
 keywords = [
     "mcp",
-    "database",
     "client",
     "agent",
     "claude"
