@@ -11,7 +11,7 @@ pub mod tools;
 pub mod transports;
 
 pub use error::ClientError;
-pub use transports::create_streamable_client;
+pub use transports::{StdioClientBuilder, create_stdio_client, create_streamable_client};
 
 /// Default timeout for MCP operations (30 seconds)
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(30);
