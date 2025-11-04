@@ -23,7 +23,10 @@ pub struct StartCrawlResponse {
 pub struct StartSearchResponse {
     /// The session ID for this search
     /// Supports both `sessionId` (camelCase) and `session_id` (`snake_case`)
-    #[serde(alias = "sessionId")]
+    #[serde(
+        alias = "sessionId",
+        deserialize_with = "deserialize_non_empty_string"
+    )]
     pub session_id: String,
 }
 
@@ -31,6 +34,7 @@ pub struct StartSearchResponse {
 #[derive(Debug, Deserialize)]
 pub struct SpawnClaudeAgentResponse {
     /// The session IDs for spawned Claude agents
+    #[serde(deserialize_with = "deserialize_vec_non_empty_strings")]
     pub session_ids: Vec<String>,
 
     /// Number of workers spawned
