@@ -49,6 +49,7 @@ pub struct SpawnClaudeAgentResponse {
 #[derive(Debug, Deserialize)]
 pub struct StartTerminalCommandResponse {
     /// The process ID (PID) of the started command
+    #[serde(deserialize_with = "deserialize_positive_i64")]
     pub pid: i64,
 
     /// Optional status information
@@ -150,6 +151,7 @@ pub struct MemoryInfo {
 /// Response from `sequential_thinking` tool
 #[derive(Debug, Deserialize)]
 pub struct SequentialThinkingResponse {
+    #[serde(deserialize_with = "deserialize_non_empty_string")]
     pub session_id: String,
     pub thought_number: u32,
     pub total_thoughts: u32,
