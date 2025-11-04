@@ -8,11 +8,13 @@
 //! - Prevention of silent failures from missing or mistyped fields
 
 use serde::Deserialize;
+use crate::validation::*;
 
 /// Response from starting a web crawl session
 #[derive(Debug, Deserialize)]
 pub struct StartCrawlResponse {
     /// The crawl ID for this crawl session
+    #[serde(deserialize_with = "deserialize_non_empty_string")]
     pub crawl_id: String,
 }
 
@@ -157,37 +159,28 @@ pub struct SequentialThinkingResponse {
 // ============================================================================
 
 /// GitHub user information
-#[derive(Debug, Deserialize, Clone, Default)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct GitHubUser {
-    #[serde(default)]
     pub id: u64,
-    #[serde(default)]
     pub login: String,
     #[serde(default)]
     pub name: Option<String>,
     #[serde(default)]
     pub email: Option<String>,
-    #[serde(default)]
-    pub avatar_url: String,
-    #[serde(default)]
-    pub html_url: String,
+    pub avatar_url: Option<String>,
+    pub html_url: Option<String>,
 }
 
 /// GitHub repository information
-#[derive(Debug, Deserialize, Clone, Default)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct GitHubRepository {
-    #[serde(default)]
     pub id: u64,
-    #[serde(default)]
     pub name: String,
-    #[serde(default)]
     pub full_name: String,
-    #[serde(default)]
     pub owner: GitHubUser,
     #[serde(default)]
     pub description: Option<String>,
-    #[serde(default)]
-    pub html_url: String,
+    pub html_url: Option<String>,
     #[serde(default)]
     pub clone_url: Option<String>,
     #[serde(default)]
@@ -228,7 +221,7 @@ pub struct GitHubIssue {
     pub assignees: Vec<GitHubUser>,
     #[serde(default)]
     pub labels: Vec<GitHubLabel>,
-    pub html_url: String,
+    pub html_url: Option<String>,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -239,7 +232,7 @@ pub struct GitHubComment {
     pub id: u64,
     pub body: String,
     pub user: GitHubUser,
-    pub html_url: String,
+    pub html_url: Option<String>,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -265,7 +258,7 @@ pub struct GitHubPullRequest {
     pub user: GitHubUser,
     pub head: GitHubBranchRef,
     pub base: GitHubBranchRef,
-    pub html_url: String,
+    pub html_url: Option<String>,
     #[serde(default)]
     pub mergeable: Option<bool>,
     pub merged: bool,
@@ -281,7 +274,7 @@ pub struct GitHubReview {
     #[serde(default)]
     pub body: Option<String>,
     pub state: String,
-    pub html_url: String,
+    pub html_url: Option<String>,
     #[serde(default)]
     pub submitted_at: Option<String>,
 }
@@ -322,7 +315,7 @@ pub struct GitHubCommit {
     pub author: Option<GitHubUser>,
     #[serde(default)]
     pub committer: Option<GitHubUser>,
-    pub html_url: String,
+    pub html_url: Option<String>,
 }
 
 /// GitHub commit details
@@ -400,6 +393,6 @@ pub struct GitHubCodeResult {
     pub name: String,
     pub path: String,
     pub sha: String,
-    pub html_url: String,
+    pub html_url: Option<String>,
     pub repository: GitHubRepository,
 }

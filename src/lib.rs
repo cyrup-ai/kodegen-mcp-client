@@ -9,6 +9,7 @@ pub mod error;
 pub mod responses;
 pub mod tools;
 pub mod transports;
+mod validation;
 
 pub use error::{ClientError, TransportType};
 pub use transports::{StdioClientBuilder, create_stdio_client, create_streamable_client};
