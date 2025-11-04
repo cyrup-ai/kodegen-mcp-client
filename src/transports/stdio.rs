@@ -1,10 +1,7 @@
 // packages/mcp-client/src/transports/stdio.rs
+use super::create_client_info;
 use crate::{ClientError, KodegenClient, KodegenConnection};
-use rmcp::{
-    ServiceExt,
-    model::{ClientCapabilities, ClientInfo, Implementation},
-    transport::TokioChildProcess,
-};
+use rmcp::{ServiceExt, transport::TokioChildProcess};
 use std::{collections::HashMap, path::PathBuf};
 use tokio::{process::Command, time::Duration};
 
@@ -44,6 +41,8 @@ pub struct StdioClientBuilder {
     command: String,
     args: Vec<String>,
     envs: HashMap<String, String>,
+    clear_env: bool,
+    env_removes: Vec<String>,
     current_dir: Option<PathBuf>,
     timeout: Duration,
     client_name: Option<String>,
@@ -66,6 +65,8 @@ impl StdioClientBuilder {
             command: command.into(),
             args: Vec::new(),
             envs: HashMap::new(),
+            clear_env: false,
+            env_removes: Vec::new(),
             current_dir: None,
             timeout: DEFAULT_TIMEOUT,
             client_name: None,
@@ -105,14 +106,27 @@ impl StdioClientBuilder {
         self
     }
 
-    /// Add a single environment variable
+    /// Add a single environment variable to the child process
+    ///
+    /// By default, the child process **inherits all environment variables from the parent**
+    /// and this method adds or overrides specific variables. To prevent inheritance of
+    /// sensitive variables, use `env_clear()` before adding variables, or use `env_remove()`
+    /// to selectively exclude specific variables.
+    ///
+    /// # Security Warning
+    ///
+    /// Without calling `env_clear()`, the child process will have access to **all** parent
+    /// environment variables, including potentially sensitive values like API keys,
+    /// database credentials, and authentication tokens.
     ///
     /// # Example
     ///
     /// ```ignore
-    /// let builder = StdioClientBuilder::new("node")
+    /// // Child inherits parent environment + adds NODE_ENV
+    /// let (client, _conn) = StdioClientBuilder::new("node")
     ///     .env("NODE_ENV", "production")
-    ///     .env("DEBUG", "1");
+    ///     .build()
+    ///     .await?;
     /// ```
     #[must_use]
     pub fn env(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
@@ -120,7 +134,15 @@ impl StdioClientBuilder {
         self
     }
 
-    /// Add multiple environment variables
+    /// Add multiple environment variables to the child process
+    ///
+    /// By default, the child process **inherits all environment variables from the parent**
+    /// and this method adds or overrides specific variables.
+    ///
+    /// # Security Warning
+    ///
+    /// Without calling `env_clear()`, the child process will have access to **all** parent
+    /// environment variables. See `env()` method documentation for details.
     ///
     /// # Example
     ///
@@ -137,6 +159,82 @@ impl StdioClientBuilder {
     #[must_use]
     pub fn envs(mut self, envs: HashMap<String, String>) -> Self {
         self.envs.extend(envs);
+        self
+    }
+
+    /// Clear all inherited environment variables
+    ///
+    /// After calling this method, the child process will **only** have environment variables
+    /// that are explicitly set via `env()` or `envs()`. No variables from the parent process
+    /// will be inherited.
+    ///
+    /// This is the recommended approach for security-sensitive applications where you want
+    /// explicit control over what the child process can access.
+    ///
+    /// # Example - Secure Execution
+    ///
+    /// ```ignore
+    /// // Child has ONLY these variables (parent environment completely cleared)
+    /// let (client, _conn) = StdioClientBuilder::new("node")
+    ///     .env_clear()
+    ///     .env("PATH", "/usr/bin:/usr/local/bin")
+    ///     .env("NODE_ENV", "production")
+    ///     .env("HOME", "/tmp/sandbox")
+    ///     .build()
+    ///     .await?;
+    /// ```
+    ///
+    /// # Example - Preventing Secret Leakage
+    ///
+    /// ```ignore
+    /// // Parent has AWS_SECRET_ACCESS_KEY, DATABASE_URL, etc.
+    /// // Child will NOT inherit any of them
+    /// let (client, _conn) = StdioClientBuilder::new("untrusted-script")
+    ///     .env_clear()
+    ///     .env("SAFE_VAR", "value")
+    ///     .build()
+    ///     .await?;
+    /// ```
+    #[must_use]
+    pub fn env_clear(mut self) -> Self {
+        self.clear_env = true;
+        self
+    }
+
+    /// Remove a specific environment variable from the child process
+    ///
+    /// This method prevents a specific variable from being inherited from the parent,
+    /// while allowing all other parent variables to be inherited. This is useful when
+    /// you want mostly-inherited environment but need to exclude specific variables.
+    ///
+    /// Multiple calls to `env_remove()` accumulate (each variable is tracked separately).
+    ///
+    /// # Example - Selective Removal
+    ///
+    /// ```ignore
+    /// // Inherit all parent vars EXCEPT these sensitive ones
+    /// let (client, _conn) = StdioClientBuilder::new("node")
+    ///     .env_remove("AWS_SECRET_ACCESS_KEY")
+    ///     .env_remove("DATABASE_PASSWORD")
+    ///     .env_remove("API_TOKEN")
+    ///     .env("NODE_ENV", "production")
+    ///     .build()
+    ///     .await?;
+    /// ```
+    ///
+    /// # Example - Override After Remove
+    ///
+    /// ```ignore
+    /// // Remove inherited HOME, then set custom value
+    /// let (client, _conn) = StdioClientBuilder::new("bash")
+    ///     .env_remove("HOME")
+    ///     .env("HOME", "/tmp/sandbox")
+    ///     .build()
+    ///     .await?;
+    /// ```
+    #[must_use]
+    pub fn env_remove(mut self, key: impl Into<String>) -> Self {
+        self.env_removes.push(key.into());
         self
     }
 
@@ -202,8 +300,13 @@ impl StdioClientBuilder {
     ///
     /// # Errors
     ///
-    /// Returns `ClientError::Io` if the process spawn fails,
-    /// or `ClientError::InitError` if MCP initialization fails.
+    /// Returns `ClientError::Connection` if:
+    /// - Command is empty or whitespace-only
+    /// - Command contains spaces (arguments should use .arg())
+    /// - Command not found in PATH
+    /// - Process spawn fails
+    ///
+    /// Returns `ClientError::InitError` if MCP initialization fails.
     ///
     /// # Example
     ///
@@ -217,10 +320,57 @@ impl StdioClientBuilder {
     /// // _conn dropped → process gracefully terminated
     /// ```
     pub async fn build(self) -> Result<(KodegenClient, KodegenConnection), ClientError> {
+        // Validate non-empty command
+        let trimmed_command = self.command.trim();
+        if trimmed_command.is_empty() {
+            return Err(ClientError::Connection {
+                message: "Command cannot be empty or whitespace-only".to_string(),
+                transport_type: Some(crate::TransportType::Stdio),
+                endpoint: None,
+            });
+        }
+
+        // Validate no spaces in command (common mistake)
+        if self.command.contains(' ') {
+            return Err(ClientError::Connection {
+                message: format!(
+                    "Command '{}' contains spaces. Arguments should be passed via .arg() method, not in the command string.\n\
+                    Example: StdioClientBuilder::new(\"node\").arg(\"server.js\")",
+                    self.command
+                ),
+                transport_type: Some(crate::TransportType::Stdio),
+                endpoint: Some(self.command.clone()),
+            });
+        }
+
+        // Validate command exists in PATH
+        if let Err(e) = which::which(&self.command) {
+            return Err(ClientError::Connection {
+                message: format!(
+                    "Command '{}' not found in PATH: {}\n\
+                    Please ensure the command is installed and available in your system PATH.",
+                    self.command, e
+                ),
+                transport_type: Some(crate::TransportType::Stdio),
+                endpoint: Some(self.command.clone()),
+            });
+        }
+
         // Build tokio Command with configuration
         let mut cmd = Command::new(&self.command);
         cmd.args(&self.args);
 
+        // Apply environment variable configuration
+        if self.clear_env {
+            cmd.env_clear();
+        }
+
+        // Remove specific environment variables
+        for key in &self.env_removes {
+            cmd.env_remove(key);
+        }
+
+        // Add/override custom environment variables
         if !self.envs.is_empty() {
             cmd.envs(&self.envs);
         }
@@ -230,24 +380,30 @@ impl StdioClientBuilder {
         }
 
         // Create transport - TokioChildProcess automatically sets stdin/stdout to piped
-        let transport = TokioChildProcess::new(cmd).map_err(|e| {
-            ClientError::Connection(format!("Failed to spawn process '{}': {}", self.command, e))
+        //
+        // CLEANUP BEHAVIOR: When the returned KodegenConnection is dropped or closed:
+        //   1. rmcp's DropGuard cancels the service task via CancellationToken
+        //   2. Service loop exits and calls transport.close()
+        //   3. TokioChildProcess.graceful_shutdown() executes:
+        //      - Closes stdin to signal server exit
+        //      - Waits up to 3 seconds for graceful termination (MAX_WAIT_ON_DROP_SECS)
+        //      - Force kills process if timeout exceeded (SIGKILL/TerminateProcess)
+        //   4. tokio::process::Child.wait() reaps zombie processes
+        //
+        // See: ./tmp/rmcp/crates/rmcp/src/transport/child_process.rs:114-137 (graceful_shutdown)
+        // See: ./tmp/rmcp/crates/rmcp/src/service.rs:839 (transport.close() call)
+        // See: ./tmp/rmcp/crates/rmcp/src/transport/child_process.rs:12 (MAX_WAIT_ON_DROP_SECS = 3)
+        let transport = TokioChildProcess::new(cmd).map_err(|e| ClientError::Connection {
+            message: format!("Failed to spawn process '{}': {}", self.command, e),
+            transport_type: Some(crate::TransportType::Stdio),
+            endpoint: Some(self.command.clone()),
         })?;
 
         // Create client info with metadata
-        let client_info = ClientInfo {
-            protocol_version: Default::default(),
-            capabilities: ClientCapabilities::default(),
-            client_info: Implementation {
-                name: self
-                    .client_name
-                    .unwrap_or_else(|| "kodegen-stdio-client".to_string()),
-                title: None,
-                version: env!("CARGO_PKG_VERSION").to_string(),
-                website_url: None,
-                icons: None,
-            },
-        };
+        let client_info = create_client_info(
+            self.client_name
+                .unwrap_or_else(|| "kodegen-stdio-client".to_string()),
+        );
 
         // Initialize MCP connection
         let service = client_info

@@ -1,8 +1,8 @@
 // packages/mcp-client/src/transports/http.rs
+use super::create_client_info;
 use crate::{ClientError, KodegenClient, KodegenConnection};
 use rmcp::{
     ServiceExt,
-    model::{ClientCapabilities, ClientInfo, Implementation},
     transport::{SseClientTransport, StreamableHttpClientTransport},
 };
 
@@ -28,21 +28,15 @@ pub async fn create_http_client(
     url: &str,
 ) -> Result<(KodegenClient, KodegenConnection), ClientError> {
     // SseClientTransport requires async start
-    let transport = SseClientTransport::start(url.to_owned())
+    let transport = SseClientTransport::start(url)
         .await
-        .map_err(|e| ClientError::Connection(format!("Failed to connect to HTTP endpoint: {e}")))?;
+        .map_err(|e| ClientError::Connection {
+            message: format!("Failed to connect to SSE endpoint: {e}"),
+            transport_type: Some(crate::TransportType::Sse),
+            endpoint: Some(url.to_string()),
+        })?;
 
-    let client_info = ClientInfo {
-        protocol_version: Default::default(),
-        capabilities: ClientCapabilities::default(),
-        client_info: Implementation {
-            name: "kodegen-http-client".to_string(),
-            title: None,
-            version: env!("CARGO_PKG_VERSION").to_string(),
-            website_url: None,
-            icons: None,
-        },
-    };
+    let client_info = create_client_info("kodegen-http-client");
 
     // Use () as the client type for HTTP (no custom client needed)
     let service = client_info
@@ -78,17 +72,7 @@ pub async fn create_streamable_client(
     // StreamableHttpClientTransport has simpler constructor
     let transport = StreamableHttpClientTransport::from_uri(url);
 
-    let client_info = ClientInfo {
-        protocol_version: Default::default(),
-        capabilities: ClientCapabilities::default(),
-        client_info: Implementation {
-            name: "kodegen-streamable-client".to_string(),
-            title: None,
-            version: env!("CARGO_PKG_VERSION").to_string(),
-            website_url: None,
-            icons: None,
-        },
-    };
+    let client_info = create_client_info("kodegen-streamable-client");
 
     let service = client_info
         .serve(transport)

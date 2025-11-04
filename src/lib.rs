@@ -10,8 +10,20 @@ pub mod responses;
 pub mod tools;
 pub mod transports;
 
-pub use error::ClientError;
+pub use error::{ClientError, TransportType};
 pub use transports::{StdioClientBuilder, create_stdio_client, create_streamable_client};
+
+/// Get human-readable JSON type name for error messages
+fn json_type_name(value: &serde_json::Value) -> &'static str {
+    match value {
+        serde_json::Value::Null => "null",
+        serde_json::Value::Bool(_) => "boolean",
+        serde_json::Value::Number(_) => "number",
+        serde_json::Value::String(_) => "string",
+        serde_json::Value::Array(_) => "array",
+        serde_json::Value::Object(_) => "object",
+    }
+}
 
 /// Default timeout for MCP operations (30 seconds)
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(30);
@@ -38,11 +50,26 @@ impl KodegenClient {
 
     /// Configure custom timeout for all operations
     ///
+    /// This creates a client handle with a different timeout configuration.
+    /// Each client handle has its own independent timeout setting.
+    ///
+    /// To use different timeouts for different operations, create multiple
+    /// client handles with different timeout configurations:
+    ///
     /// # Example
     ///
     /// ```ignore
-    /// let (client, _conn) = create_http_client(url).await?;
-    /// let client = client.with_timeout(Duration::from_secs(60));
+    /// let conn = /* connection */;
+    ///
+    /// // Quick operations (10s timeout)
+    /// let quick_client = conn.client().with_timeout(Duration::from_secs(10));
+    ///
+    /// // Long operations (5min timeout)
+    /// let slow_client = conn.client().with_timeout(Duration::from_secs(300));
+    ///
+    /// // Use the appropriate client for each operation
+    /// quick_client.call_tool("fast_tool", args).await?;
+    /// slow_client.call_tool("slow_tool", args).await?;
     /// ```
     #[must_use]
     pub fn with_timeout(mut self, duration: Duration) -> Self {
@@ -65,11 +92,9 @@ impl KodegenClient {
     pub async fn list_tools(&self) -> Result<Vec<rmcp::model::Tool>, ClientError> {
         timeout(self.default_timeout, self.peer.list_all_tools())
             .await
-            .map_err(|_| {
-                ClientError::Timeout(format!(
-                    "list_tools timed out after {}s",
-                    self.default_timeout.as_secs()
-                ))
+            .map_err(|_| ClientError::Timeout {
+                operation: "list_tools".to_string(),
+                duration: self.default_timeout,
             })?
             .map_err(ClientError::from)
     }
@@ -92,18 +117,21 @@ impl KodegenClient {
             name: name.to_string().into(),
             arguments: match arguments {
                 serde_json::Value::Object(map) => Some(map),
-                _ => None,
+                serde_json::Value::Null => None,
+                other => {
+                    return Err(ClientError::Protocol(format!(
+                        "Tool arguments must be a JSON object or null, got {}",
+                        json_type_name(&other)
+                    )));
+                }
             },
         });
 
         timeout(self.default_timeout, call)
             .await
-            .map_err(|_| {
-                ClientError::Timeout(format!(
-                    "Tool '{}' timed out after {}s",
-                    name,
-                    self.default_timeout.as_secs()
-                ))
+            .map_err(|_| ClientError::Timeout {
+                operation: format!("Tool '{}'", name),
+                duration: self.default_timeout,
             })?
             .map_err(ClientError::from)
     }
@@ -139,18 +167,41 @@ impl KodegenClient {
     {
         let result = self.call_tool(name, arguments).await?;
 
-        // Extract text content from response
+        // Extract text content from response - search all items
         let text_content = result
             .content
-            .first()
-            .and_then(|c| c.as_text())
+            .iter()
+            .find_map(|c| c.as_text())
             .ok_or_else(|| {
-                ClientError::ParseError(format!("No text content in response from tool '{name}'"))
+                if result.content.is_empty() {
+                    ClientError::Protocol(format!("Tool '{}' returned empty content array", name))
+                } else {
+                    // Show what content types were returned
+                    let content_types: Vec<_> = result
+                        .content
+                        .iter()
+                        .map(|c| match c.raw {
+                            rmcp::model::RawContent::Text(_) => "text",
+                            rmcp::model::RawContent::Image(_) => "image",
+                            rmcp::model::RawContent::Resource(_) => "resource",
+                            rmcp::model::RawContent::Audio(_) => "audio",
+                            rmcp::model::RawContent::ResourceLink(_) => "resource_link",
+                        })
+                        .collect();
+
+                    ClientError::Protocol(format!(
+                        "Tool '{}' returned {} content item(s) but none were text: [{}]",
+                        name,
+                        result.content.len(),
+                        content_types.join(", ")
+                    ))
+                }
             })?;
 
         // Deserialize to target type with context
-        serde_json::from_str(&text_content.text).map_err(|e| {
-            ClientError::ParseError(format!("Failed to parse response from tool '{name}': {e}"))
+        serde_json::from_str(&text_content.text).map_err(|e| ClientError::ParseError {
+            tool_name: name.to_string(),
+            source: e,
         })
     }
 }
@@ -161,7 +212,36 @@ impl KodegenClient {
 /// NOT Clone - only one owner should manage the connection lifecycle.
 ///
 /// The connection should be held as long as you want the MCP connection to remain active.
-/// When dropped, the connection will be cancelled automatically.
+///
+/// ## Cleanup Behavior
+///
+/// When dropped or when `close()` is called, the following cleanup occurs:
+///
+/// 1. **Service Cancellation**: rmcp's `DropGuard` cancels the internal `CancellationToken`
+/// 2. **Loop Exit**: Service loop detects cancellation and exits gracefully  
+/// 3. **Transport Close**: For stdio connections, `TokioChildProcess.graceful_shutdown()` executes:
+///    - Closes stdin to signal server exit
+///    - Waits up to 3 seconds for graceful termination
+///    - Force kills process if timeout exceeded (SIGKILL/TerminateProcess)
+/// 4. **Zombie Prevention**: `tokio::process::Child.wait()` reaps the process
+///
+/// Both `drop(connection)` and `connection.close().await` trigger the same cleanup flow.
+/// Use `close()` if you need to await and handle cleanup errors; use drop for fire-and-forget.
+///
+/// ## Example
+///
+/// ```ignore
+/// // Implicit cleanup via drop
+/// {
+///     let (client, conn) = create_stdio_client("node", &["server.js"]).await?;
+///     // ... use client ...
+/// } // Process terminated here via graceful shutdown
+///
+/// // Explicit cleanup with error handling
+/// let (client, conn) = create_stdio_client("node", &["server.js"]).await?;
+/// // ... use client ...
+/// conn.close().await?;  // Await cleanup, handle errors
+/// ```
 pub struct KodegenConnection {
     service: RunningService<RoleClient, ClientInfo>,
 }
@@ -189,10 +269,27 @@ impl KodegenConnection {
     /// Graceful shutdown with proper MCP protocol cancellation
     ///
     /// Consumes the connection and performs a clean shutdown of the MCP protocol.
+    /// This triggers the same cleanup as dropping the connection, but allows you to
+    /// await completion and handle any errors.
+    ///
+    /// ## Cleanup Sequence
+    ///
+    /// 1. Cancels the service task via `CancellationToken`
+    /// 2. Service loop exits and calls `transport.close()`
+    /// 3. For stdio transports: stdin closed, 3-second wait, force kill if needed
+    /// 4. Process reaped to prevent zombies
+    ///
+    /// ## Drop vs Close
+    ///
+    /// - **drop(connection)**: Fire-and-forget cleanup (cleanup errors logged but not returned)
+    /// - **connection.close().await**: Awaitable cleanup (returns errors to caller)
     ///
     /// # Errors
     ///
-    /// Returns `ClientError` if the service cancellation fails.
+    /// Returns `ClientError` if:
+    /// - Service cancellation fails
+    /// - Transport close fails (e.g., process kill error)
+    /// - Service task panicked
     pub async fn close(self) -> Result<(), ClientError> {
         self.service
             .cancel()

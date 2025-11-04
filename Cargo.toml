@@ -39,5 +39,8 @@ chrono = { version = "0.4", features = ["serde"] }
 # Process management (for cleanup on error in examples)
 sysinfo = "0.37"
 
+# Command path validation
+which = "8"
+
 [dev-dependencies]
 tempfile = "3"  # For filesystem test fixtures

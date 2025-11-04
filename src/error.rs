@@ -1,10 +1,22 @@
 use rmcp::service::ClientInitializeError;
+use std::time::Duration;
 use thiserror::Error;
+
+/// Transport type for connection errors
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TransportType {
+    /// HTTP/HTTPS transport
+    Http,
+    /// Standard I/O (stdio) transport
+    Stdio,
+    /// Server-Sent Events (SSE) transport
+    Sse,
+}
 
 #[derive(Error, Debug)]
 pub enum ClientError {
     #[error("MCP protocol error: {0}")]
-    Protocol(#[from] rmcp::RmcpError),
+    Protocol(String),
 
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
@@ -18,12 +30,22 @@ pub enum ClientError {
     #[error("Task join error: {0}")]
     JoinError(#[from] tokio::task::JoinError),
 
-    #[error("Operation timed out: {0}")]
-    Timeout(String),
+    #[error("Operation '{operation}' timed out after {duration:?}")]
+    Timeout {
+        operation: String,
+        duration: Duration,
+    },
 
-    #[error("Failed to parse response: {0}")]
-    ParseError(String),
+    #[error("Failed to parse response from tool '{tool_name}': {source}")]
+    ParseError {
+        tool_name: String,
+        source: serde_json::Error,
+    },
 
-    #[error("Connection error: {0}")]
-    Connection(String),
+    #[error("Connection error: {message}")]
+    Connection {
+        message: String,
+        transport_type: Option<TransportType>,
+        endpoint: Option<String>,
+    },
 }
