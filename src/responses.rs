@@ -45,6 +45,19 @@ pub struct SpawnClaudeAgentResponse {
     pub agents: Vec<serde_json::Value>,
 }
 
+impl Validate for SpawnClaudeAgentResponse {
+    fn validate(&self) -> Result<(), String> {
+        if self.session_ids.len() != self.worker_count as usize {
+            return Err(count_mismatch_error(
+                "worker_count",
+                self.worker_count as usize,
+                self.session_ids.len(),
+            ));
+        }
+        Ok(())
+    }
+}
+
 /// Response from starting a terminal command
 #[derive(Debug, Deserialize)]
 pub struct StartTerminalCommandResponse {
@@ -167,7 +180,9 @@ pub struct SequentialThinkingResponse {
 /// GitHub user information
 #[derive(Debug, Deserialize, Clone)]
 pub struct GitHubUser {
+    #[serde(deserialize_with = "deserialize_positive_u64")]
     pub id: u64,
+    #[serde(deserialize_with = "deserialize_non_empty_string")]
     pub login: String,
     #[serde(default)]
     pub name: Option<String>,
@@ -375,6 +390,19 @@ pub struct GitHubIssuesResponse {
     pub issues: Vec<GitHubIssue>,
 }
 
+impl Validate for GitHubIssuesResponse {
+    fn validate(&self) -> Result<(), String> {
+        if self.count as usize != self.issues.len() {
+            return Err(count_mismatch_error(
+                "count",
+                self.count as usize,
+                self.issues.len(),
+            ));
+        }
+        Ok(())
+    }
+}
+
 /// Response wrapper for `get_issue_comments` tool
 ///
 /// Our GitHub tools return this custom format instead of standard GitHub API format.
@@ -391,6 +419,19 @@ pub struct GitHubCommentsResponse {
 
     /// Complete GitHub Comment objects with all fields populated
     pub comments: Vec<GitHubComment>,
+}
+
+impl Validate for GitHubCommentsResponse {
+    fn validate(&self) -> Result<(), String> {
+        if self.count as usize != self.comments.len() {
+            return Err(count_mismatch_error(
+                "count",
+                self.count as usize,
+                self.comments.len(),
+            ));
+        }
+        Ok(())
+    }
 }
 
 /// GitHub code search result

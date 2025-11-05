@@ -9,7 +9,7 @@ pub mod error;
 pub mod responses;
 pub mod tools;
 pub mod transports;
-mod validation;
+pub mod validation;
 
 pub use error::{ClientError, TransportType};
 pub use transports::{StdioClientBuilder, create_stdio_client, create_streamable_client};
@@ -31,9 +31,56 @@ const DEFAULT_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// Cheap-to-clone client handle for MCP operations
 ///
-/// This handle can be cloned freely and shared across tasks/threads.
-/// All MCP operations (`call_tool`, `list_tools`, etc.) are available through this handle.
-/// Cloning only copies Arc pointers internally, making it very cheap.
+/// This handle can be cloned freely and shared across tasks/threads. The handle
+/// wraps a `Peer<RoleClient>` from the `rmcp` crate, which internally contains
+/// four Arc pointers. Cloning only copies these Arc pointers (16 bytes each on
+/// 64-bit systems) and increments reference counts atomically.
+///
+/// ## Thread Safety
+///
+/// `KodegenClient` is both `Send` and `Sync`, making it safe to share across threads:
+///
+/// ```ignore
+/// let client2 = client.clone();
+/// tokio::spawn(async move {
+///     client2.call_tool("my_tool", args).await
+/// });
+/// ```
+///
+/// ## Timeout Behavior
+///
+/// Each client handle maintains its own timeout value. Cloning a client creates
+/// a new handle with a **copy** of the current timeout, but changes to one handle's
+/// timeout do not affect other handles:
+///
+/// ```ignore
+/// let client1 = client.clone();
+/// let client2 = client.with_timeout(Duration::from_secs(60));
+/// // client1 still has default 30s timeout
+/// // client2 has 60s timeout
+/// ```
+///
+/// To set timeout for all clients, call `with_timeout()` before any `clone()`.
+///
+/// ## Performance
+///
+/// - Clone cost: ~48 bytes + 4 atomic increments (near-zero overhead)
+/// - Memory per client: ~32 bytes (Arc pointers + Duration)
+/// - No limit on number of clones (uses standard Arc reference counting)
+/// - All clones share the same underlying MCP connection
+///
+/// ## Relationship to KodegenConnection
+///
+/// While the client handle can be cloned freely, the underlying connection
+/// is managed by `KodegenConnection`. When the connection is dropped, all
+/// client handles become invalid:
+///
+/// ```ignore
+/// let (client, conn) = create_http_client(url).await?;
+/// let client2 = client.clone();
+/// drop(conn);  // Connection closed
+/// client2.list_tools().await?;  // Error: connection closed
+/// ```
 #[derive(Clone)]
 pub struct KodegenClient {
     peer: Peer<RoleClient>,
@@ -229,6 +276,22 @@ impl KodegenClient {
 /// Both `drop(connection)` and `connection.close().await` trigger the same cleanup flow.
 /// Use `close()` if you need to await and handle cleanup errors; use drop for fire-and-forget.
 ///
+/// ## Relationship to Clients
+///
+/// All client handles created from this connection become invalid when
+/// the connection is dropped:
+///
+/// ```ignore
+/// let (client, conn) = create_http_client(url).await?;
+/// let client2 = client.clone();
+///
+/// drop(conn);  // Closes connection
+///
+/// // Both clients now fail:
+/// client.list_tools().await?;  // Error
+/// client2.call_tool(...).await?;  // Error
+/// ```
+///
 /// ## Example
 ///
 /// ```ignore
@@ -243,6 +306,7 @@ impl KodegenClient {
 /// // ... use client ...
 /// conn.close().await?;  // Await cleanup, handle errors
 /// ```
+#[must_use = "Connection must be held to keep MCP service alive"]
 pub struct KodegenConnection {
     service: RunningService<RoleClient, ClientInfo>,
 }
