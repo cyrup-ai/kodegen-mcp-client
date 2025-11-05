@@ -22,7 +22,7 @@ pub enum ClientError {
     Io(#[from] std::io::Error),
 
     #[error("Client initialization error: {0}")]
-    InitError(#[from] ClientInitializeError),
+    InitError(Box<ClientInitializeError>),
 
     #[error("Service error: {0}")]
     ServiceError(#[from] rmcp::ServiceError),
@@ -48,4 +48,11 @@ pub enum ClientError {
         transport_type: Option<TransportType>,
         endpoint: Option<String>,
     },
+}
+
+// Manual From implementation to handle boxing of ClientInitializeError
+impl From<ClientInitializeError> for ClientError {
+    fn from(error: ClientInitializeError) -> Self {
+        Self::InitError(Box::new(error))
+    }
 }

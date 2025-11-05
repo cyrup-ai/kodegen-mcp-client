@@ -41,8 +41,7 @@ pub async fn create_http_client(
     // Use () as the client type for HTTP (no custom client needed)
     let service = client_info
         .serve(transport)
-        .await
-        .map_err(ClientError::InitError)?;
+        .await?;
 
     // Use KodegenConnection to wrap service, then extract client
     let connection = KodegenConnection::from_service(service);
@@ -76,8 +75,7 @@ pub async fn create_streamable_client(
 
     let service = client_info
         .serve(transport)
-        .await
-        .map_err(ClientError::InitError)?;
+        .await?;
 
     // Use KodegenConnection to wrap service, then extract client
     let connection = KodegenConnection::from_service(service);

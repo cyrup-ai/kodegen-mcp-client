@@ -408,8 +408,7 @@ impl StdioClientBuilder {
         // Initialize MCP connection
         let service = client_info
             .serve(transport)
-            .await
-            .map_err(ClientError::InitError)?;
+            .await?;
 
         // Wrap in connection and extract client with configured timeout
         let connection = KodegenConnection::from_service(service);

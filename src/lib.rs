@@ -317,7 +317,6 @@ impl KodegenConnection {
     /// This is a low-level constructor for creating a connection from an already-initialized
     /// MCP service. Most users should use the transport functions like `create_http_client()`
     /// which handle both service creation and connection setup.
-    #[must_use]
     pub fn from_service(service: RunningService<RoleClient, ClientInfo>) -> Self {
         Self { service }
     }
