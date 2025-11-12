@@ -12,7 +12,7 @@ pub const CREATE_DIRECTORY: &str = "create_directory";
 pub const GET_FILE_INFO: &str = "get_file_info";
 pub const EDIT_BLOCK: &str = "edit_block";
 pub const START_SEARCH: &str = "start_search";
-pub const GET_MORE_SEARCH_RESULTS: &str = "get_more_search_results";
+pub const get_search_results: &str = "get_search_results";
 pub const STOP_SEARCH: &str = "stop_search";
 pub const LIST_SEARCHES: &str = "list_searches";
 
