@@ -1,20 +1,20 @@
 // Tool name constants for all 75 kodegen tools
 
 // Filesystem tools (14)
-pub const READ_FILE: &str = "read_file";
-pub const READ_MULTIPLE_FILES: &str = "read_multiple_files";
-pub const WRITE_FILE: &str = "write_file";
-pub const MOVE_FILE: &str = "move_file";
-pub const DELETE_FILE: &str = "delete_file";
-pub const DELETE_DIRECTORY: &str = "delete_directory";
-pub const LIST_DIRECTORY: &str = "list_directory";
-pub const CREATE_DIRECTORY: &str = "create_directory";
-pub const GET_FILE_INFO: &str = "get_file_info";
-pub const EDIT_BLOCK: &str = "edit_block";
-pub const START_SEARCH: &str = "start_search";
-pub const GET_SEARCH_RESULTS: &str = "get_search_results";
-pub const STOP_SEARCH: &str = "stop_search";
-pub const LIST_SEARCHES: &str = "list_searches";
+pub const READ_FILE: &str = "fs_read_file";
+pub const READ_MULTIPLE_FILES: &str = "fs_read_multiple_files";
+pub const WRITE_FILE: &str = "fs_write_file";
+pub const MOVE_FILE: &str = "fs_move_file";
+pub const DELETE_FILE: &str = "fs_delete_file";
+pub const DELETE_DIRECTORY: &str = "fs_delete_directory";
+pub const LIST_DIRECTORY: &str = "fs_list_directory";
+pub const CREATE_DIRECTORY: &str = "fs_create_directory";
+pub const GET_FILE_INFO: &str = "fs_get_file_info";
+pub const EDIT_BLOCK: &str = "fs_edit_block";
+pub const START_SEARCH: &str = "fs_start_search";
+pub const GET_SEARCH_RESULTS: &str = "fs_get_search_results";
+pub const STOP_SEARCH: &str = "fs_stop_search";
+pub const LIST_SEARCHES: &str = "fs_list_searches";
 
 // Terminal tools (5)
 pub const START_TERMINAL_COMMAND: &str = "start_terminal_command";
@@ -24,33 +24,33 @@ pub const STOP_TERMINAL_COMMAND: &str = "stop_terminal_command";
 pub const LIST_TERMINAL_COMMANDS: &str = "list_terminal_commands";
 
 // Process tools (2)
-pub const LIST_PROCESSES: &str = "list_processes";
-pub const KILL_PROCESS: &str = "kill_process";
+pub const PROCESS_LIST: &str = "process_list";
+pub const PROCESS_KILL: &str = "process_kill";
 
 // Introspection tools (2)
-pub const GET_USAGE_STATS: &str = "get_usage_stats";
-pub const GET_RECENT_TOOL_CALLS: &str = "get_recent_tool_calls";
+pub const INSPECT_USAGE_STATS: &str = "inspect_usage_stats";
+pub const INSPECT_TOOL_CALLS: &str = "inspect_tool_calls";
 
 // Prompt tools (4)
-pub const ADD_PROMPT: &str = "add_prompt";
-pub const EDIT_PROMPT: &str = "edit_prompt";
-pub const DELETE_PROMPT: &str = "delete_prompt";
-pub const GET_PROMPT: &str = "get_prompt";
+pub const ADD_PROMPT: &str = "prompt_add";
+pub const EDIT_PROMPT: &str = "prompt_edit";
+pub const DELETE_PROMPT: &str = "prompt_delete";
+pub const GET_PROMPT: &str = "prompt_get";
 
 // Sequential thinking (1)
 pub const SEQUENTIAL_THINKING: &str = "sequential_thinking";
 
 // Claude agent tools (5)
-pub const SPAWN_CLAUDE_AGENT: &str = "spawn_claude_agent";
-pub const READ_CLAUDE_AGENT_OUTPUT: &str = "read_claude_agent_output";
-pub const SEND_CLAUDE_AGENT_PROMPT: &str = "send_claude_agent_prompt";
-pub const TERMINATE_CLAUDE_AGENT_SESSION: &str = "terminate_claude_agent_session";
-pub const LIST_CLAUDE_AGENTS: &str = "list_claude_agents";
+pub const SPAWN_CLAUDE_AGENT: &str = "claude_spawn_agent";
+pub const READ_CLAUDE_AGENT_OUTPUT: &str = "claude_read_agent_output";
+pub const SEND_CLAUDE_AGENT_PROMPT: &str = "claude_send_agent_prompt";
+pub const TERMINATE_CLAUDE_AGENT_SESSION: &str = "claude_terminate_agent_session";
+pub const LIST_CLAUDE_AGENTS: &str = "claude_list_agents";
 
 // Citescrape tools (4)
-pub const START_CRAWL: &str = "start_crawl";
-pub const GET_CRAWL_RESULTS: &str = "get_crawl_results";
-pub const SEARCH_CRAWL_RESULTS: &str = "search_crawl_results";
+pub const START_CRAWL: &str = "scrape_url";
+pub const GET_CRAWL_RESULTS: &str = "scrape_check_results";
+pub const SEARCH_CRAWL_RESULTS: &str = "scrape_search_results";
 pub const WEB_SEARCH: &str = "web_search";
 
 // Git tools (20)
