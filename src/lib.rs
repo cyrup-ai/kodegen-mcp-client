@@ -7,7 +7,6 @@ use tokio::time::{Duration, timeout};
 
 pub mod error;
 pub mod responses;
-pub mod tools;
 pub mod transports;
 pub mod validation;
 
