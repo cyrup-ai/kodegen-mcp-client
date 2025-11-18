@@ -5,8 +5,17 @@ use rmcp::{ServiceExt, transport::TokioChildProcess};
 use std::{collections::HashMap, path::PathBuf};
 use tokio::{process::Command, time::Duration};
 
-/// Default timeout for MCP operations (30 seconds)
-const DEFAULT_TIMEOUT: Duration = Duration::from_secs(30);
+/// Default timeout for MCP operations
+/// 
+/// Based on worst-case tool timings:
+/// - Terminal operations: 10s max (5s reader + 5s writer cleanup)
+/// - Most other tools: < 5s
+/// - Network operations: variable
+/// 
+/// Set to 12s = 10s worst-case + 2s overhead buffer
+/// 
+/// For tools with different characteristics, use client.with_timeout()
+const DEFAULT_TIMEOUT: Duration = Duration::from_secs(12);
 
 /// Builder for creating stdio-based MCP clients
 ///
