@@ -1,6 +1,6 @@
 [package]
 name = "kodegen_mcp_client"
-version = "0.2.2"
+version = "0.3.0"
 edition = "2024"
 description = "KODEGEN.ᴀɪ: Database query and schema exploration MCP tools for AI agents."
 license = "Apache-2.0 OR MIT"
@@ -18,7 +18,7 @@ keywords = [
 
 [dependencies]
 # MCP SDK with client features
-rmcp = { version = "0.8", features = ["client", "transport-child-process", "transport-sse-client-reqwest", "transport-streamable-http-client-reqwest"] }
+rmcp = { version = "0.9", features = ["client", "transport-child-process", "transport-sse-client-reqwest", "transport-streamable-http-client-reqwest"] }
 
 # Async runtime
 tokio = { version = "1", features = ["full"] }
