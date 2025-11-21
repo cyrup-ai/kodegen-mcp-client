@@ -95,6 +95,11 @@ impl KodegenClient {
         }
     }
 
+    /// Get reference to the underlying MCP peer for creating execution contexts
+    pub fn peer(&self) -> &Peer<RoleClient> {
+        &self.peer
+    }
+
     /// Configure custom timeout for all operations
     ///
     /// This creates a client handle with a different timeout configuration.
