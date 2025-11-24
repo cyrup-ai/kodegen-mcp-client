@@ -1,3 +1,7 @@
+<div align="center">
+  <img src="assets/img/banner.png" alt="Kodegen AI Banner" width="100%" />
+</div>
+
 # kodegen-mcp-client
 
 [![License](https://img.shields.io/badge/license-Apache%202.0%20OR%20MIT-blue.svg)](LICENSE.md)
@@ -43,27 +47,49 @@ kodegen_mcp_client = "0.1"
 ## Quick Start
 
 ```rust
-use kodegen_mcp_client::{create_streamable_client, tools};
+use kodegen_mcp_client::{create_streamable_client, tools, X_SESSION_PWD, X_SESSION_GITROOT};
+use reqwest::header::{HeaderMap, HeaderValue};
 use serde_json::json;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Create client connection
-    let (client, _conn) = create_streamable_client("http://localhost:8000/mcp").await?;
-    
+    // Build session context headers
+    let mut headers = HeaderMap::new();
+    let cwd = std::env::current_dir()?;
+    headers.insert(X_SESSION_PWD, HeaderValue::from_str(&cwd.to_string_lossy())?);
+    // Add git root if available
+    if let Some(git_root) = find_git_root(&cwd) {
+        headers.insert(X_SESSION_GITROOT, HeaderValue::from_str(&git_root.to_string_lossy())?);
+    }
+
+    // Create client connection with session headers
+    let (client, _conn) = create_streamable_client("http://localhost:8000/mcp", headers).await?;
+
     // List available tools
     let tools = client.list_tools().await?;
     println!("Available tools: {}", tools.len());
-    
+
     // Call a tool with JSON arguments
     let result = client.call_tool(
         tools::LIST_SCHEMAS,
         json!({}),
     ).await?;
-    
+
     println!("Result: {:?}", result);
-    
+
     Ok(())
+}
+
+fn find_git_root(start: &std::path::Path) -> Option<std::path::PathBuf> {
+    let mut current = start.to_path_buf();
+    loop {
+        if current.join(".git").exists() {
+            return Some(current);
+        }
+        if !current.pop() {
+            return None;
+        }
+    }
 }
 ```
 
@@ -96,7 +122,9 @@ println!("Search session ID: {}", response.session_id);
 Client handles are cheap to clone and can be shared across tasks:
 
 ```rust
-let (client, _conn) = create_streamable_client(url).await?;
+use reqwest::header::HeaderMap;
+
+let (client, _conn) = create_streamable_client(url, HeaderMap::new()).await?;
 
 // Clone the client for concurrent operations
 let client2 = client.clone();
@@ -111,9 +139,10 @@ client.call_tool(tools::READ_FILE, args).await?;
 ### Custom Timeouts
 
 ```rust
+use reqwest::header::HeaderMap;
 use tokio::time::Duration;
 
-let (client, _conn) = create_streamable_client(url).await?;
+let (client, _conn) = create_streamable_client(url, HeaderMap::new()).await?;
 
 // Set custom timeout (default is 30 seconds)
 let client = client.with_timeout(Duration::from_secs(60));
@@ -173,7 +202,9 @@ The library uses a two-struct pattern for resource management:
   - Automatically cancels connection when dropped
 
 ```rust
-let (client, _conn) = create_streamable_client(url).await?;
+use reqwest::header::HeaderMap;
+
+let (client, _conn) = create_streamable_client(url, HeaderMap::new()).await?;
 // client: Clone freely
 // _conn: Hold until shutdown desired (auto-cleanup on drop)
 ```
@@ -226,8 +257,9 @@ Error variants:
 
 ```rust
 use kodegen_mcp_client::create_streamable_client;
+use reqwest::header::HeaderMap;
 
-let (client, conn) = create_streamable_client("http://localhost:8000/mcp").await?;
+let (client, conn) = create_streamable_client("http://localhost:8000/mcp", HeaderMap::new()).await?;
 ```
 
 ### HTTP/SSE (Server-Sent Events)

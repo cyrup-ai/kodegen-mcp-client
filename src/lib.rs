@@ -6,11 +6,13 @@ use rmcp::{
 use tokio::time::{Duration, timeout};
 
 pub mod error;
+pub mod headers;
 pub mod responses;
 pub mod transports;
 pub mod validation;
 
 pub use error::{ClientError, TransportType};
+pub use headers::{X_KODEGEN_CONNECTION_ID, X_KODEGEN_GITROOT, X_KODEGEN_PWD};
 pub use transports::{StdioClientBuilder, create_stdio_client, create_streamable_client};
 
 /// Get human-readable JSON type name for error messages
