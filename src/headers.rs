@@ -2,11 +2,9 @@
 //! Infrastructure context headers for kodegen stdio → HTTP backend communication.
 //!
 //! These headers pass infrastructure context from the kodegen stdio server to HTTP backend servers,
-//! enabling resource isolation, CWD tracking, and session management.
-
-/// Header containing the stdio connection ID (UUID).
-/// Used for isolating resources (terminals, sessions) between different kodegen instances.
-pub const X_KODEGEN_CONNECTION_ID: &str = "x-kodegen-connection-id";
+//! enabling CWD tracking and git root detection.
+//!
+//! Note: Session/connection identification uses the MCP standard `Mcp-Session-Id` header.
 
 /// Header containing the current working directory from which kodegen was spawned.
 /// Used by backend servers for path resolution and as default CWD for operations.
