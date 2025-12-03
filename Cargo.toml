@@ -1,6 +1,6 @@
 [package]
 name = "kodegen_mcp_client"
-version = "0.5.4"
+version = "0.6.0"
 edition = "2024"
 description = "KODEGEN.ᴀɪ: Database query and schema exploration MCP tools for AI agents."
 license = "Apache-2.0 OR MIT"
@@ -46,7 +46,7 @@ sysinfo = "0.37"
 which = "8"
 
 # Shared infrastructure constants
-kodegen_config = { version = "0.5" }
+kodegen_config = { version = "0.6" }
 
 [dev-dependencies]
 tempfile = "3"  # For filesystem test fixtures
