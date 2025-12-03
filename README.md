@@ -12,7 +12,7 @@ A Rust client library for interacting with [MCP (Model Context Protocol)](https:
 ## Features
 
 ✨ **Type-Safe MCP Client**
-- Strongly-typed response structures for all 75+ KODEGEN tools
+- Strongly-typed response structures for all 100+ KODEGEN tools
 - Compile-time type checking with `call_tool_typed<T>()`
 - Support for both `camelCase` and `snake_case` field names
 
@@ -211,7 +211,7 @@ let (client, _conn) = create_streamable_client(url, HeaderMap::new()).await?;
 
 ## Available Tool Categories
 
-The library provides type-safe access to 75+ KODEGEN.ᴀɪ tools across multiple categories:
+The library provides type-safe access to 100+ KODEGEN.ᴀɪ tools across multiple categories:
 
 
 - **Filesystem** (14 tools): File operations, search, directory management
