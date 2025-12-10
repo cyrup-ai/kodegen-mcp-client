@@ -5,12 +5,10 @@ use thiserror::Error;
 /// Transport type for connection errors
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TransportType {
-    /// HTTP/HTTPS transport
+    /// HTTP/HTTPS transport (Streamable HTTP)
     Http,
     /// Standard I/O (stdio) transport
     Stdio,
-    /// Server-Sent Events (SSE) transport
-    Sse,
 }
 
 #[derive(Error, Debug)]

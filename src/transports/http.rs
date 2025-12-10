@@ -5,7 +5,7 @@ use reqwest::header::HeaderMap;
 use rmcp::{
     ServiceExt,
     transport::{
-        SseClientTransport, StreamableHttpClientTransport,
+        StreamableHttpClientTransport,
         streamable_http_client::StreamableHttpClientTransportConfig,
     },
 };
@@ -31,27 +31,8 @@ use rmcp::{
 pub async fn create_http_client(
     url: &str,
 ) -> Result<(KodegenClient, KodegenConnection), ClientError> {
-    // SseClientTransport requires async start
-    let transport = SseClientTransport::start(url)
-        .await
-        .map_err(|e| ClientError::Connection {
-            message: format!("Failed to connect to SSE endpoint: {e}"),
-            transport_type: Some(crate::TransportType::Sse),
-            endpoint: Some(url.to_string()),
-        })?;
-
-    let client_info = create_client_info("kodegen-http-client");
-
-    // Use () as the client type for HTTP (no custom client needed)
-    let service = client_info
-        .serve(transport)
-        .await?;
-
-    // Use KodegenConnection to wrap service, then extract client
-    let connection = KodegenConnection::from_service(service);
-    let client = connection.client();
-
-    Ok((client, connection))
+    // Use streamable HTTP transport (SSE was removed in rmcp v0.11)
+    create_streamable_client(url, HeaderMap::new()).await
 }
 
 /// Create a Streamable HTTP client from a URL with default headers
