@@ -27,8 +27,8 @@ fn json_type_name(value: &serde_json::Value) -> &'static str {
     }
 }
 
-/// Default timeout for MCP operations (30 seconds)
-const DEFAULT_TIMEOUT: Duration = Duration::from_secs(30);
+/// Default timeout for MCP operations (10 minutes)
+const DEFAULT_TIMEOUT: Duration = Duration::from_secs(600);
 
 /// Cheap-to-clone client handle for MCP operations
 ///
@@ -57,7 +57,7 @@ const DEFAULT_TIMEOUT: Duration = Duration::from_secs(30);
 /// ```ignore
 /// let client1 = client.clone();
 /// let client2 = client.with_timeout(Duration::from_secs(60));
-/// // client1 still has default 30s timeout
+/// // client1 still has default 10min timeout
 /// // client2 has 60s timeout
 /// ```
 ///

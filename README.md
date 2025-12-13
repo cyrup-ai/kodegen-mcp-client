@@ -144,7 +144,7 @@ use tokio::time::Duration;
 
 let (client, _conn) = create_streamable_client(url, HeaderMap::new()).await?;
 
-// Set custom timeout (default is 30 seconds)
+// Set custom timeout (default is 10 minutes)
 let client = client.with_timeout(Duration::from_secs(60));
 ```
 
